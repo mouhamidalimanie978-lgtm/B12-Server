@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>B12 SYSTEM - REAL CHAT</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #000; color: #00ff00; font-family: 'Courier New'; height: 100vh; }
+        .screen { display: none; position: fixed; top:0; left:0; width:100%; height:100%; flex-direction: column; }
+        .screen.active { display: flex; }
+        .register-form { background: rgba(0,20,0,0.9); padding: 2rem; border-radius: 10px; border: 2px solid #00ff00; width: 90%; max-width: 500px; margin: auto; }
+        .form-control { width: 100%; padding: 10px; background: rgba(0,0,0,0.7); border: 1px solid #00ff00; color: #00ff00; margin: 10px 0; }
+        .submit-btn { width: 100%; padding: 12px; background: transparent; border: 2px solid #00ff00; color: #00ff00; cursor: pointer; }
+        .chat-container { display: flex; height: 100vh; }
+        .users-panel { width: 250px; background: rgba(0,20,0,0.8); padding: 1rem; border-right: 1px solid #00ff00; }
+        .chat-area { flex: 1; display: flex; flex-direction: column; }
+        .messages-container { flex: 1; padding: 1rem; overflow-y: auto; background: rgba(0,0,0,0.5); }
+        .message-input-container { display: flex; padding: 1rem; background: rgba(0,20,0,0.8); border-top: 1px solid #00ff00; }
+        .message-input { flex: 1; padding: 10px; background: rgba(0,0,0,0.7); border: 1px solid #00ff00; color: #00ff00; }
+        .send-btn { background: #00ff00; color: #000; border: none; padding: 10px 20px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="register-screen" class="screen active">
+        <div class="register-form">
+            <h2>🚀 تسجيل الدخول إلى B12</h2>
+            <form id="register-form">
+                <input type="text" id="real-name" class="form-control" placeholder="اسمك" required>
+                <button type="submit" class="submit-btn">الدخول إلى الدردشة</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="chat-screen" class="screen">
+        <div class="chat-container">
+            <div class="users-panel">
+                <h3>👥 المتصلون (<span id="users-count">0</span>)</h3>
+                <ul id="user-list"></ul>
+            </div>
+            <div class="chat-area">
+                <div class="messages-container" id="messages-container"></div>
+                <div class="message-input-container">
+                    <input type="text" class="message-input" id="message-input" placeholder="اكتب رسالتك...">
+                    <button class="send-btn" id="send-btn">إرسال</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let currentUser = null;
+
+        document.getElementById('register-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const realName = document.getElementById('real-name').value;
+            
+            currentUser = { realName: realName, isAdmin: realName.toLowerCase() === 'admin' };
+            socket.emit('join_server', currentUser);
+            
+            document.getElementById('register-screen').classList.remove('active');
+            document.getElementById('chat-screen').classList.add('active');
+        });
+
+        document.getElementById('send-btn').addEventListener('click', sendMessage);
+        document.getElementById('message-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        function sendMessage() {
+            const content = document.getElementById('message-input').value;
+            if (content) {
+                socket.emit('send_message', { content: content, type: 'text' });
+                document.getElementById('message-input').value = '';
+            }
+        }
+
+        socket.on('load_messages', (messages) => {
+            messages.forEach(renderMessage);
+        });
+
+        socket.on('new_message', renderMessage);
+
+        socket.on('user_joined', (data) => {
+            document.getElementById('users-count').textContent = data.onlineUsers.length;
+            updateUserList(data.onlineUsers);
+        });
+
+        function renderMessage(message) {
+            const div = document.createElement('div');
+            div.innerHTML = `<strong>${message.userName}:</strong> ${message.content}`;
+            div.style.margin = '10px 0';
+            document.getElementById('messages-container').appendChild(div);
+        }
+
+        function updateUserList(users) {
+            const list = document.getElementById('user-list');
+            list.innerHTML = '';
+            users.forEach(user => {
+                const li = document.createElement('li');
+                li.textContent = user.realName;
+                list.appendChild(li);
+            });
+        }
+    </script>
+</body>
+</html>
