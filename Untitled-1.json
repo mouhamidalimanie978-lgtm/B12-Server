@@ -1,7 +1,7 @@
 {
-  "name": "B12-chat-app",
+  "name": "discord-clone",
   "version": "1.0.0",
-  "description": "تطبيق شات أونلاين فوري",
+  "description": "نسخة مشابهة لـ Discord",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -12,7 +12,7 @@
     "socket.io": "^4.7.2",
     "cors": "^2.8.5"
   },
-  "keywords": ["chat", "online", "realtime"],
-  "author": "Chat App",
+  "keywords": ["discord", "chat", "realtime"],
+  "author": "Discord Clone",
   "license": "MIT"
 }

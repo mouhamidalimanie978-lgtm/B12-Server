@@ -3,111 +3,351 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>شات أونلاين 🚀</title>
+    <title>Discord Clone 🎮</title>
     <script src="/socket.io/socket.io.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
-            font-family: Arial, sans-serif; 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #36393f;
+            color: #dcddde;
             height: 100vh;
             display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        .chat-app {
-            width: 90%;
-            max-width: 400px;
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
             overflow: hidden;
         }
-        .header {
-            background: #4f46e5;
-            color: white;
-            padding: 20px;
-            text-align: center;
-        }
-        .status { 
-            background: #10b981; 
-            padding: 10px; 
-            color: white;
-            text-align: center;
-            font-size: 14px;
-        }
-        .chat-container {
-            height: 400px;
-            overflow-y: auto;
-            padding: 20px;
-        }
-        .message {
-            margin: 10px 0;
-            padding: 10px;
-            border-radius: 10px;
-            max-width: 80%;
-        }
-        .message.own {
-            background: #4f46e5;
-            color: white;
-            margin-left: auto;
-        }
-        .message.other {
-            background: #f3f4f6;
-            color: #333;
-        }
-        .input-area {
-            display: flex;
-            padding: 15px;
-            border-top: 1px solid #e5e7eb;
-        }
-        .input-area input {
-            flex: 1;
+
+        /* السايدبار الأيسر */
+        .servers-sidebar {
+            width: 70px;
+            background: #202225;
             padding: 12px;
-            border: 1px solid #d1d5db;
-            border-radius: 25px;
-            margin-left: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
         }
-        .input-area button {
-            background: #4f46e5;
-            color: white;
-            border: none;
-            padding: 12px 20px;
-            border-radius: 25px;
-            cursor: pointer;
-        }
-        .online-users {
-            background: #f8fafc;
-            padding: 10px;
-            border-bottom: 1px solid #e5e7eb;
-        }
-        .user-item {
+
+        .server-icon {
+            width: 48px;
+            height: 48px;
+            background: #36393f;
+            border-radius: 50%;
             display: flex;
             align-items: center;
-            margin: 5px 0;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 18px;
         }
-        .online-dot {
+
+        .server-icon:hover {
+            background: #5865f2;
+            border-radius: 16px;
+        }
+
+        .server-icon.active {
+            background: #5865f2;
+            border-radius: 16px;
+        }
+
+        /* سايدبار القنوات */
+        .channels-sidebar {
+            width: 240px;
+            background: #2f3136;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .server-header {
+            padding: 16px;
+            border-bottom: 1px solid #202225;
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .channels-list {
+            padding: 16px;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .channel-category {
+            color: #8e9297;
+            font-size: 12px;
+            font-weight: bold;
+            margin: 16px 0 8px 0;
+            text-transform: uppercase;
+        }
+
+        .channel-item {
+            padding: 6px 8px;
+            margin: 2px 0;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+        }
+
+        .channel-item:hover {
+            background: #3a3c42;
+        }
+
+        .channel-item.active {
+            background: #40444b;
+        }
+
+        .channel-item.voice {
+            color: #8e9297;
+        }
+
+        .channel-item.voice:hover {
+            color: #dcddde;
+        }
+
+        /* منطقة الشات الرئيسية */
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #36393f;
+        }
+
+        .chat-header {
+            padding: 16px;
+            border-bottom: 1px solid #202225;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: bold;
+        }
+
+        .messages-container {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .message {
+            display: flex;
+            gap: 16px;
+            padding: 4px 0;
+        }
+
+        .message-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #5865f2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .message-content {
+            flex: 1;
+        }
+
+        .message-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+
+        .message-author {
+            font-weight: bold;
+            color: white;
+        }
+
+        .message-timestamp {
+            color: #72767d;
+            font-size: 12px;
+        }
+
+        .message-text {
+            color: #dcddde;
+            line-height: 1.4;
+        }
+
+        /* منطقة الكتابة */
+        .message-input-container {
+            padding: 16px;
+            background: #40444b;
+            margin: 16px;
+            border-radius: 8px;
+        }
+
+        .message-input {
+            width: 100%;
+            background: transparent;
+            border: none;
+            color: #dcddde;
+            font-size: 16px;
+            outline: none;
+        }
+
+        .message-input::placeholder {
+            color: #72767d;
+        }
+
+        /* قائمة الأعضاء */
+        .members-sidebar {
+            width: 240px;
+            background: #2f3136;
+            padding: 16px;
+            overflow-y: auto;
+        }
+
+        .members-title {
+            color: #8e9297;
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 16px;
+            text-transform: uppercase;
+        }
+
+        .member-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 8px;
+            border-radius: 4px;
+            margin: 2px 0;
+        }
+
+        .member-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #5865f2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+
+        .member-name {
+            font-size: 14px;
+            color: #8e9297;
+        }
+
+        .member-name.online {
+            color: #dcddde;
+        }
+
+        .status-indicator {
             width: 8px;
             height: 8px;
-            background: #10b981;
             border-radius: 50%;
-            margin-left: 8px;
+            background: #3ba55c;
+        }
+
+        /* صوتيات */
+        .voice-channel {
+            background: #2f3136;
+            padding: 8px 16px;
+            border-top: 1px solid #202225;
+        }
+
+        .voice-users {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .voice-user {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            background: #40444b;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
         }
     </style>
 </head>
 <body>
-    <div class="chat-app">
-        <div class="header">
-            <h1>💬 شات أونلاين</h1>
+    <!-- السيرفرات -->
+    <div class="servers-sidebar">
+        <div class="server-icon active">🎮</div>
+        <div class="server-icon">➕</div>
+    </div>
+
+    <!-- القنوات -->
+    <div class="channels-sidebar">
+        <div class="server-header">🎮 سيرفر الرائع</div>
+        <div class="channels-list">
+            <div class="channel-category">القنوات النصية</div>
+            <div class="channel-item active">
+                <i class="fas fa-hashtag"></i>
+                💬 عام
+            </div>
+            <div class="channel-item">
+                <i class="fas fa-hashtag"></i>
+                🎮 جيمز
+            </div>
+
+            <div class="channel-category">القنوات الصوتية</div>
+            <div class="channel-item voice">
+                <i class="fas fa-volume-up"></i>
+                🔊 الترحيب
+            </div>
+            <div class="channel-item voice">
+                <i class="fas fa-volume-up"></i>
+                🎵 مزيكا
+            </div>
         </div>
-        <div class="status" id="status">
-            🔄 جاري الاتصال...
+
+        <!-- معلومات المستخدم -->
+        <div class="user-panel" style="padding: 8px; background: #292b2f; display: flex; align-items: center; gap: 8px;">
+            <div class="member-avatar" id="userAvatar">👤</div>
+            <div style="flex: 1;">
+                <div id="username" style="font-size: 14px; font-weight: bold;">...</div>
+                <div id="userTag" style="font-size: 12px; color: #72767d;">#0000</div>
+            </div>
         </div>
-        <div class="online-users" id="onlineUsers"></div>
-        <div class="chat-container" id="chatContainer"></div>
-        <div class="input-area">
-            <input type="text" id="messageInput" placeholder="اكتب رسالتك هنا...">
-            <button onclick="sendMessage()">إرسال</button>
+    </div>
+
+    <!-- منطقة الشات -->
+    <div class="chat-area">
+        <div class="chat-header">
+            <i class="fas fa-hashtag"></i>
+            <span>💬 عام</span>
+        </div>
+
+        <div class="messages-container" id="messagesContainer">
+            <div class="message">
+                <div class="message-avatar">🤖</div>
+                <div class="message-content">
+                    <div class="message-header">
+                        <span class="message-author">DiscordBot</span>
+                        <span class="message-timestamp">الآن</span>
+                    </div>
+                    <div class="message-text">
+                        🎉 مرحباً في السيرفر! ابدأ المحادثة الآن.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="message-input-container">
+            <input type="text" class="message-input" placeholder="رسالة في #عام" id="messageInput">
+        </div>
+    </div>
+
+    <!-- قائمة الأعضاء -->
+    <div class="members-sidebar">
+        <div class="members-title">الأعضاء - <span id="onlineCount">1</span></div>
+        <div id="membersList">
+            <!-- الأعضاء يظهرون هنا -->
         </div>
     </div>
 
@@ -117,254 +357,85 @@
 
         // الاتصال بالسيرفر
         socket.on('connect', () => {
-            document.getElementById('status').innerHTML = '🟢 متصل - أونلاين الآن';
-            loginUser();
+            console.log('✅ متصل بالسيرفر');
+            joinServer();
         });
 
-        // تسجيل الدخول التلقائي
-        function loginUser() {
-            const username = 'مستخدم_' + Math.floor(Math.random() * 1000);
+        // انضمام للسيرفر
+        function joinServer() {
+            const username = 'مستخدم_' + Math.floor(Math.random() * 10000);
             currentUser = username;
             
-            socket.emit('user_login', {
+            socket.emit('join_server', {
                 username: username,
                 avatar: '👤'
             });
         }
 
-        // استقبال المستخدمين الأونلاين
-        socket.on('online_users', (users) => {
-            const usersList = users.map(user => 
-                `<div class="user-item">
-                    <span class="online-dot"></span>
-                    ${user.username}
-                 </div>`
-            ).join('');
-            document.getElementById('onlineUsers').innerHTML = usersList;
+        // استقبال بيانات السيرفر
+        socket.on('server_data', (data) => {
+            document.getElementById('username').textContent = data.currentUser.username;
+            document.getElementById('userTag').textContent = '#' + data.currentUser.discriminator;
+            document.getElementById('userAvatar').textContent = data.currentUser.avatar;
+        });
+
+        // استقبال الأعضاء
+        socket.on('members_update', (members) => {
+            const membersList = document.getElementById('membersList');
+            const onlineCount = members.filter(m => m.status === 'online').length;
+            
+            document.getElementById('onlineCount').textContent = onlineCount;
+
+            membersList.innerHTML = members.map(member => `
+                <div class="member-item">
+                    <div class="member-avatar">${member.avatar}</div>
+                    <div class="member-name ${member.status === 'online' ? 'online' : ''}">
+                        ${member.username}
+                    </div>
+                    <div class="status-indicator"></div>
+                </div>
+            `).join('');
         });
 
         // استقبال الرسائل
         socket.on('new_message', (message) => {
-            const chatContainer = document.getElementById('chatContainer');
+            const messagesContainer = document.getElementById('messagesContainer');
             const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${message.sender === currentUser ? 'own' : 'other'}`;
+            messageDiv.className = 'message';
             messageDiv.innerHTML = `
-                <strong>${message.sender}</strong>
-                <div>${message.content}</div>
-                <small>${new Date(message.timestamp).toLocaleTimeString()}</small>
+                <div class="message-avatar">${message.author.avatar}</div>
+                <div class="message-content">
+                    <div class="message-header">
+                        <span class="message-author">${message.author.username}</span>
+                        <span class="message-timestamp">${new Date(message.timestamp).toLocaleTimeString()}</span>
+                    </div>
+                    <div class="message-text">${message.content}</div>
+                </div>
             `;
-            chatContainer.appendChild(messageDiv);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
         });
 
         // إرسال رسالة
-        function sendMessage() {
-            const input = document.getElementById('messageInput');
-            const message = input.value.trim();
-            
-            if (message) {
-                socket.emit('send_message', {
-                    content: message,
-                    type: 'text',
-                    room: 'general'
-                });
-                input.value = '';
-            }
-        }
-
-        // إرسال بالضغط على Enter
         document.getElementById('messageInput').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') sendMessage();
+            if (e.key === 'Enter' && e.target.value.trim()) {
+                socket.emit('send_message', {
+                    content: e.target.value,
+                    channelId: 'general'
+                });
+                e.target.value = '';
+            }
         });
 
-        // تحديث حالة الاتصال
-        socket.on('disconnect', () => {
-            document.getElementById('status').innerHTML = '🔴 غير متصل';
-        });
-    </script>
-</body>
-</html><!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>شات أونلاين 🚀</title>
-    <script src="/socket.io/socket.io.js"></script>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            font-family: Arial, sans-serif; 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        .chat-app {
-            width: 90%;
-            max-width: 400px;
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            overflow: hidden;
-        }
-        .header {
-            background: #4f46e5;
-            color: white;
-            padding: 20px;
-            text-align: center;
-        }
-        .status { 
-            background: #10b981; 
-            padding: 10px; 
-            color: white;
-            text-align: center;
-            font-size: 14px;
-        }
-        .chat-container {
-            height: 400px;
-            overflow-y: auto;
-            padding: 20px;
-        }
-        .message {
-            margin: 10px 0;
-            padding: 10px;
-            border-radius: 10px;
-            max-width: 80%;
-        }
-        .message.own {
-            background: #4f46e5;
-            color: white;
-            margin-left: auto;
-        }
-        .message.other {
-            background: #f3f4f6;
-            color: #333;
-        }
-        .input-area {
-            display: flex;
-            padding: 15px;
-            border-top: 1px solid #e5e7eb;
-        }
-        .input-area input {
-            flex: 1;
-            padding: 12px;
-            border: 1px solid #d1d5db;
-            border-radius: 25px;
-            margin-left: 10px;
-        }
-        .input-area button {
-            background: #4f46e5;
-            color: white;
-            border: none;
-            padding: 12px 20px;
-            border-radius: 25px;
-            cursor: pointer;
-        }
-        .online-users {
-            background: #f8fafc;
-            padding: 10px;
-            border-bottom: 1px solid #e5e7eb;
-        }
-        .user-item {
-            display: flex;
-            align-items: center;
-            margin: 5px 0;
-        }
-        .online-dot {
-            width: 8px;
-            height: 8px;
-            background: #10b981;
-            border-radius: 50%;
-            margin-left: 8px;
-        }
-    </style>
-</head>
-<body>
-    <div class="chat-app">
-        <div class="header">
-            <h1>💬 شات أونلاين</h1>
-        </div>
-        <div class="status" id="status">
-            🔄 جاري الاتصال...
-        </div>
-        <div class="online-users" id="onlineUsers"></div>
-        <div class="chat-container" id="chatContainer"></div>
-        <div class="input-area">
-            <input type="text" id="messageInput" placeholder="اكتب رسالتك هنا...">
-            <button onclick="sendMessage()">إرسال</button>
-        </div>
-    </div>
-
-    <script>
-        const socket = io();
-        let currentUser = null;
-
-        // الاتصال بالسيرفر
-        socket.on('connect', () => {
-            document.getElementById('status').innerHTML = '🟢 متصل - أونلاين الآن';
-            loginUser();
-        });
-
-        // تسجيل الدخول التلقائي
-        function loginUser() {
-            const username = 'مستخدم_' + Math.floor(Math.random() * 1000);
-            currentUser = username;
-            
-            socket.emit('user_login', {
-                username: username,
-                avatar: '👤'
+        // تبديل القنوات
+        document.querySelectorAll('.channel-item').forEach(item => {
+            item.addEventListener('click', function() {
+                document.querySelectorAll('.channel-item').forEach(i => i.classList.remove('active'));
+                this.classList.add('active');
+                
+                const channelName = this.textContent.trim();
+                document.querySelector('.chat-header span').textContent = channelName;
             });
-        }
-
-        // استقبال المستخدمين الأونلاين
-        socket.on('online_users', (users) => {
-            const usersList = users.map(user => 
-                `<div class="user-item">
-                    <span class="online-dot"></span>
-                    ${user.username}
-                 </div>`
-            ).join('');
-            document.getElementById('onlineUsers').innerHTML = usersList;
-        });
-
-        // استقبال الرسائل
-        socket.on('new_message', (message) => {
-            const chatContainer = document.getElementById('chatContainer');
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${message.sender === currentUser ? 'own' : 'other'}`;
-            messageDiv.innerHTML = `
-                <strong>${message.sender}</strong>
-                <div>${message.content}</div>
-                <small>${new Date(message.timestamp).toLocaleTimeString()}</small>
-            `;
-            chatContainer.appendChild(messageDiv);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-        });
-
-        // إرسال رسالة
-        function sendMessage() {
-            const input = document.getElementById('messageInput');
-            const message = input.value.trim();
-            
-            if (message) {
-                socket.emit('send_message', {
-                    content: message,
-                    type: 'text',
-                    room: 'general'
-                });
-                input.value = '';
-            }
-        }
-
-        // إرسال بالضغط على Enter
-        document.getElementById('messageInput').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') sendMessage();
-        });
-
-        // تحديث حالة الاتصال
-        socket.on('disconnect', () => {
-            document.getElementById('status').innerHTML = '🔴 غير متصل';
         });
     </script>
 </body>

@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
+const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
@@ -14,116 +15,173 @@ const io = socketIo(server, {
 
 app.use(cors());
 app.use(express.json());
+app.use(express.static(path.join(__dirname, 'client')));
 
-// تخزين البيانات في الذاكرة (للتشغيل الفوري)
-let users = new Map();
-let rooms = new Map();
-let messages = new Map();
+// تخزين البيانات
+const servers = new Map();
+const users = new Map();
+const voiceChannels = new Map();
 
-// Socket.io للأونلاين المباشر
+// السيرفر الافتراضي
+servers.set('default', {
+  id: 'default',
+  name: 'سيرفر الرائع',
+  icon: '🎮',
+  channels: [
+    { id: 'welcome', name: '🔊 الترحيب', type: 'voice' },
+    { id: 'general', name: '💬 عام', type: 'text' },
+    { id: 'gaming', name: '🎮 جيمز', type: 'text' },
+    { id: 'music', name: '🎵 مزيكا', type: 'voice' }
+  ],
+  members: new Set()
+});
+
+// Socket.io events
 io.on('connection', (socket) => {
-  console.log('🔥 مستخدم اتصل: ' + socket.id);
+  console.log('🎮 مستخدم انضم: ' + socket.id);
 
-  // تسجيل الدخول
-  socket.on('user_login', (userData) => {
-    users.set(socket.id, {
+  // انضمام للسيرفر
+  socket.on('join_server', (userData) => {
+    const user = {
       id: socket.id,
       username: userData.username,
-      online: true,
-      avatar: userData.avatar
+      discriminator: Math.floor(Math.random() * 10000).toString().padStart(4, '0'),
+      avatar: userData.avatar || '👤',
+      status: 'online',
+      currentChannel: null,
+      currentVoiceChannel: null
+    };
+
+    users.set(socket.id, user);
+    servers.get('default').members.add(socket.id);
+
+    // إرسال بيانات السيرفر للمستخدم
+    socket.emit('server_data', {
+      server: servers.get('default'),
+      currentUser: user
     });
 
-    // إعلام الجميع بالمستخدم الجديد
-    io.emit('user_online', {
-      id: socket.id,
-      username: userData.username,
-      online: true
-    });
+    // تحديث قائمة الأعضاء للجميع
+    io.emit('members_update', Array.from(users.values()));
+  });
 
-    // إرسال قائمة المستخدمين المتصلين
-    socket.emit('online_users', Array.from(users.values()));
+  // تغيير القناة
+  socket.on('switch_channel', (channelId) => {
+    const user = users.get(socket.id);
+    if (user) {
+      user.currentChannel = channelId;
+      socket.join(channelId);
+      
+      // إرسال رسائل القناة
+      socket.emit('channel_messages', []);
+    }
   });
 
   // إرسال رسالة
   socket.on('send_message', (messageData) => {
     const user = users.get(socket.id);
-    if (user) {
+    if (user && user.currentChannel) {
       const message = {
         id: Date.now(),
-        sender: user.username,
+        author: {
+          id: user.id,
+          username: user.username,
+          discriminator: user.discriminator,
+          avatar: user.avatar
+        },
         content: messageData.content,
-        type: messageData.type || 'text',
         timestamp: new Date(),
-        room: messageData.room || 'general'
+        channelId: user.currentChannel,
+        attachments: messageData.attachments || []
       };
 
-      // إرسال للجميع في الغرفة
-      io.emit('new_message', message);
+      // إرسال للجميع في القناة
+      io.to(user.currentChannel).emit('new_message', message);
     }
   });
 
-  // إنشاء غرفة
-  socket.on('create_room', (roomData) => {
-    const room = {
-      id: Date.now().toString(),
-      name: roomData.name,
-      createdBy: socket.id,
-      members: [socket.id]
-    };
-    
-    rooms.set(room.id, room);
-    io.emit('room_created', room);
+  // الانضمام لقناة صوتية
+  socket.on('join_voice', (channelId) => {
+    const user = users.get(socket.id);
+    if (user) {
+      user.currentVoiceChannel = channelId;
+      socket.join(`voice_${channelId}`);
+      
+      io.emit('voice_update', {
+        channelId,
+        user: user,
+        action: 'join'
+      });
+    }
   });
 
-  // المكالمات الصوتية عبر WebRTC
-  socket.on('call_user', (data) => {
-    socket.to(data.to).emit('incoming_call', {
-      from: socket.id,
-      username: users.get(socket.id)?.username,
-      offer: data.offer
+  // مغادرة القناة الصوتية
+  socket.on('leave_voice', () => {
+    const user = users.get(socket.id);
+    if (user && user.currentVoiceChannel) {
+      const channelId = user.currentVoiceChannel;
+      user.currentVoiceChannel = null;
+      
+      io.emit('voice_update', {
+        channelId,
+        user: user,
+        action: 'leave'
+      });
+    }
+  });
+
+  // WebRTC signaling للمكالمات
+  socket.on('webrtc_offer', (data) => {
+    socket.to(data.target).emit('webrtc_offer', {
+      offer: data.offer,
+      from: socket.id
     });
   });
 
-  socket.on('call_accepted', (data) => {
-    socket.to(data.to).emit('call_accepted', {
-      from: socket.id,
-      answer: data.answer
+  socket.on('webrtc_answer', (data) => {
+    socket.to(data.target).emit('webrtc_answer', {
+      answer: data.answer,
+      from: socket.id
     });
   });
 
-  // عند انقطاع الاتصال
+  socket.on('webrtc_ice_candidate', (data) => {
+    socket.to(data.target).emit('webrtc_ice_candidate', {
+      candidate: data.candidate,
+      from: socket.id
+    });
+  });
+
+  // عند الانقطاع
   socket.on('disconnect', () => {
     const user = users.get(socket.id);
     if (user) {
       users.delete(socket.id);
+      servers.get('default').members.delete(socket.id);
+      
       io.emit('user_offline', socket.id);
+      io.emit('members_update', Array.from(users.values()));
     }
-    console.log('❌ مستخدم انقطع: ' + socket.id);
+    console.log('❌ مستخدم غادر: ' + socket.id);
   });
 });
 
-// مسارات API
+// Routes
 app.get('/', (req, res) => {
-  res.json({ 
-    message: '🚀 سيرفر الشات يعمل بنجاح!',
-    online_users: users.size,
-    status: 'ACTIVE'
-  });
+  res.sendFile(path.join(__dirname, 'client', 'index.html'));
 });
 
-app.get('/status', (req, res) => {
+app.get('/api/status', (req, res) => {
   res.json({
     online: true,
+    servers: servers.size,
     users_online: users.size,
-    rooms_count: rooms.size,
     timestamp: new Date()
   });
 });
 
-// تشغيل السيرفر
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`🎉 السيرفر شغال على http://localhost:${PORT}`);
-  console.log(`👥 مستخدمين أونلاين: ${users.size}`);
-  console.log(`🌐 جاهز للاستخدام المباشر!`);
+  console.log(`🎮 B12 Clone running on http://localhost:${PORT}`);
+  console.log(`👥 Online: ${users.size} users`);
 });
