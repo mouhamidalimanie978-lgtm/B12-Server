@@ -2,11 +2,9 @@ const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
-const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-
 const io = socketIo(server, {
   cors: {
     origin: "*",
@@ -16,103 +14,116 @@ const io = socketIo(server, {
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
 
-// تخزين البيانات
-const users = new Map();
-const messagesHistory = [];
+// تخزين البيانات في الذاكرة (للتشغيل الفوري)
+let users = new Map();
+let rooms = new Map();
+let messages = new Map();
 
-// Socket.io events
+// Socket.io للأونلاين المباشر
 io.on('connection', (socket) => {
-  console.log('🔗 مستخدم متصل:', socket.id);
+  console.log('🔥 مستخدم اتصل: ' + socket.id);
 
-  socket.on('join_server', (userData) => {
-    const user = {
+  // تسجيل الدخول
+  socket.on('user_login', (userData) => {
+    users.set(socket.id, {
       id: socket.id,
-      userId: generateUserId(),
-      ...userData,
-      joinTime: new Date(),
-      isOnline: true
-    };
-    
-    users.set(socket.id, user);
-    
-    // إرسال التاريخ للمستخدم الجديد
-    socket.emit('load_messages', messagesHistory.slice(-100));
-    
-    // إعلام الجميع
-    socket.broadcast.emit('user_joined', {
-      user: user,
-      onlineUsers: Array.from(users.values()).filter(u => u.isOnline)
+      username: userData.username,
+      online: true,
+      avatar: userData.avatar
     });
-    
-    // رسالة ترحيب
-    const welcomeMsg = {
-      id: generateId(),
-      userId: 'system',
-      userName: 'النظام',
-      content: `🎉 انضم ${user.realName} إلى الدردشة`,
-      time: new Date(),
-      type: 'system'
-    };
-    
-    messagesHistory.push(welcomeMsg);
-    io.emit('new_message', welcomeMsg);
-    
-    console.log(`✅ ${user.realName} انضم إلى السيرفر`);
+
+    // إعلام الجميع بالمستخدم الجديد
+    io.emit('user_online', {
+      id: socket.id,
+      username: userData.username,
+      online: true
+    });
+
+    // إرسال قائمة المستخدمين المتصلين
+    socket.emit('online_users', Array.from(users.values()));
   });
 
+  // إرسال رسالة
   socket.on('send_message', (messageData) => {
     const user = users.get(socket.id);
-    if (!user) return;
-    
-    const message = {
-      id: generateId(),
-      userId: user.id,
-      userDisplayId: user.userId,
-      userName: user.realName,
-      userIsAdmin: user.isAdmin,
-      ...messageData,
-      time: new Date()
-    };
-    
-    messagesHistory.push(message);
-    io.emit('new_message', message);
+    if (user) {
+      const message = {
+        id: Date.now(),
+        sender: user.username,
+        content: messageData.content,
+        type: messageData.type || 'text',
+        timestamp: new Date(),
+        room: messageData.room || 'general'
+      };
+
+      // إرسال للجميع في الغرفة
+      io.emit('new_message', message);
+    }
   });
 
+  // إنشاء غرفة
+  socket.on('create_room', (roomData) => {
+    const room = {
+      id: Date.now().toString(),
+      name: roomData.name,
+      createdBy: socket.id,
+      members: [socket.id]
+    };
+    
+    rooms.set(room.id, room);
+    io.emit('room_created', room);
+  });
+
+  // المكالمات الصوتية عبر WebRTC
+  socket.on('call_user', (data) => {
+    socket.to(data.to).emit('incoming_call', {
+      from: socket.id,
+      username: users.get(socket.id)?.username,
+      offer: data.offer
+    });
+  });
+
+  socket.on('call_accepted', (data) => {
+    socket.to(data.to).emit('call_accepted', {
+      from: socket.id,
+      answer: data.answer
+    });
+  });
+
+  // عند انقطاع الاتصال
   socket.on('disconnect', () => {
     const user = users.get(socket.id);
     if (user) {
-      user.isOnline = false;
-      
-      const leaveMsg = {
-        id: generateId(),
-        userId: 'system',
-        userName: 'النظام',
-        content: `👋 غادر ${user.realName} الدردشة`,
-        time: new Date(),
-        type: 'system'
-      };
-      
-      messagesHistory.push(leaveMsg);
-      socket.broadcast.emit('new_message', leaveMsg);
-      socket.broadcast.emit('user_left', user);
-      
       users.delete(socket.id);
-      console.log(`❌ ${user.realName} غادر السيرفر`);
+      io.emit('user_offline', socket.id);
     }
+    console.log('❌ مستخدم انقطع: ' + socket.id);
   });
 });
 
-function generateUserId() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-}
+// مسارات API
+app.get('/', (req, res) => {
+  res.json({ 
+    message: '🚀 سيرفر الشات يعمل بنجاح!',
+    online_users: users.size,
+    status: 'ACTIVE'
+  });
+});
 
-function generateId() {
-  return Date.now().toString() + Math.random().toString(36).substr(2, 9);
-}
+app.get('/status', (req, res) => {
+  res.json({
+    online: true,
+    users_online: users.size,
+    rooms_count: rooms.size,
+    timestamp: new Date()
+  });
+});
 
+// تشغيل السيرفر
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`🚀 B12 Server running on port ${PORT}`);
+  console.log(`🎉 السيرفر شغال على http://localhost:${PORT}`);
+  console.log(`👥 مستخدمين أونلاين: ${users.size}`);
+  console.log(`🌐 جاهز للاستخدام المباشر!`);
 });
